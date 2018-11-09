@@ -192,6 +192,7 @@ class Manager(object):
         timeout = 0.001  # Seconds
         # timer = time.time()
         logger.debug("[RESULT_PUSH_THREAD] Starting thread")
+        counter = 0
 
         while not kill_event.is_set():
             time.sleep(LOOP_SLOWDOWN)
@@ -201,8 +202,11 @@ class Manager(object):
                     r = self.pending_result_queue.get(block=True)
                     items.append(r)
 
-                if items:
+                if items:            
                     self.result_outgoing.send_multipart(items)
+                    counter+=len(items)
+                    logger.debug("[RESULT_PUSH_THREAD] Sending {} results of total {}".format(len(items),
+                                                                                              counter))
 
             except queue.Empty:
                 logger.debug("[RESULT_PUSH_THREAD] No results to send in past {} seconds".format(timeout))

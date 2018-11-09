@@ -82,7 +82,10 @@ class TasksOutgoing(object):
             socks = dict(self.poller.poll(timeout=timeout_ms))
             if self.zmq_socket in socks and socks[self.zmq_socket] == zmq.POLLOUT:
                 # The copy option adds latency but reduces the risk of ZMQ overflow
-                self.zmq_socket.send_pyobj(message, copy=True)
+                try:
+                    self.zmq_socket.send_pyobj(message, copy=True)
+                except Exception as e:
+                    logger.exception("Exception in send:{}".format(e))
                 return
             else:
                 timeout_ms += 1

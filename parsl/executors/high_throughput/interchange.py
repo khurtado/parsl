@@ -201,6 +201,8 @@ class Interchange(object):
             except zmq.Again:
                 # We just timed out while attempting to receive
                 continue
+            except Exception as e:
+                logger.debug("[TASK_PULL_THREAD] caught this one: {}".format(e))
 
             if msg == 'STOP':
                 kill_event.set()
