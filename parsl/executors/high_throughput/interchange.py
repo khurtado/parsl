@@ -122,8 +122,11 @@ class Interchange(object):
         self.worker_ports = worker_ports
         self.worker_port_range = worker_port_range
 
+        # Router sockets need HWM to be set to 0 otherwise they drop packets
         self.task_outgoing = self.context.socket(zmq.ROUTER)
+        self.task_outgoing.set_hwm(0)
         self.results_incoming = self.context.socket(zmq.ROUTER)
+        self.results_outgoing.set_hwm(0)
 
         if self.worker_ports:
             self.worker_task_port = self.worker_ports[0]
