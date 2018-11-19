@@ -69,10 +69,12 @@ class Manager(object):
 
         self.context = zmq.Context()
         self.task_incoming = self.context.socket(zmq.DEALER)
+        self.task_incoming.set_hwm(0)
         self.task_incoming.setsockopt(zmq.IDENTITY, uid.encode('utf-8'))
         self.task_incoming.connect(task_q_url)
 
         self.result_outgoing = self.context.socket(zmq.DEALER)
+        self.result_outgoing.set_hwm(0)
         self.result_outgoing.setsockopt(zmq.IDENTITY, uid.encode('utf-8'))
         self.result_outgoing.connect(result_q_url)
         logger.info("Manager connected")
@@ -110,7 +112,7 @@ class Manager(object):
     def heartbeat(self):
         """ Send heartbeat to the incoming task queue
         """
-        heartbeat = (0).to_bytes(4, "little")
+        heartbeat = (-1).to_bytes(4, "little")
         r = self.task_incoming.send(heartbeat)
         logger.debug("Return from heartbeat: {}".format(r))
 
@@ -157,7 +159,7 @@ class Manager(object):
 
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
                 poll_timer = 1
-                _, pkl_msg = self.task_incoming.recv_multipart()
+                _, pkl_msg = self.task_incoming.recv_multipart(copy=True)
                 tasks = pickle.loads(pkl_msg)
                 if tasks == 'STOP':
                     logger.critical("[TASK_PULL_THREAD] Received stop request")
@@ -192,20 +194,52 @@ class Manager(object):
         timeout = 0.001  # Seconds
         # timer = time.time()
         logger.debug("[RESULT_PUSH_THREAD] Starting thread")
+        result_counter = 0
 
-        while not kill_event.is_set():
-            time.sleep(LOOP_SLOWDOWN)
+        message_counter = 0
+        # while not kill_event.is_set():
+        poller = zmq.Poller()
+        poller.register(self.result_outgoing, zmq.POLLOUT)
+
+        while True:
+            time.sleep(timeout)
             items = []
             try:
                 while not self.pending_result_queue.empty():
                     r = self.pending_result_queue.get(block=True)
                     items.append(r)
 
-                if items:
-                    self.result_outgoing.send_multipart(items)
+                if not items:
+                    continue
+
+                result_counter += len(items)
+                # self.result_outgoing.send_multipart(items)
+
+                # Remove the following, only for debug
+                foo = [(message_counter).to_bytes(4, "little")] + items
+                # Dealer sockets will block if the receivers have reached HWM.
+                # That is okay here.
+                # self.result_outgoing.send_multipart(foo, copy=True)
+
+                timeout_ms = 0
+                while True:
+                    socks = dict(poller.poll(timeout=timeout_ms))
+                    if self.result_outgoing in socks and socks[self.result_outgoing] == zmq.POLLOUT:
+                        # The copy option adds latency but reduces the risk of ZMQ overflow
+                        #self.zmq_socket.send_pyobj(message, copy=True)
+                        self.result_outgoing.send_multipart(foo, copy=True)
+                        break
+                    else:
+                        timeout_ms = min(1000, timeout_ms+5)
+                        logger.debug("[RESULT_PUSH_THREAD] Not sending due full zmq pipe")
+
+                logger.debug("[RESULT] Seq:{} count:{}".format(message_counter, len(items)))
+                message_counter += 1
+                logger.debug("[RESULT_PUSH_THREAD] Sending {} of {} results".format(len(items),
+                                                                                    result_counter))
 
             except queue.Empty:
-                logger.debug("[RESULT_PUSH_THREAD] No results to send in past {} seconds".format(timeout))
+                logger.debug("[RESULT_PUSH_THREAD] No results to send")
 
             except Exception as e:
                 logger.exception("[RESULT_PUSH_THREAD] Got an exception: {}".format(e))
