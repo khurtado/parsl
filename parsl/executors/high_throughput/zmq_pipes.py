@@ -111,6 +111,7 @@ class ResultsIncoming(object):
         """
         self.context = zmq.Context()
         self.results_receiver = self.context.socket(zmq.DEALER)
+        self.results_receiver.set_hwm(0)
         self.port = self.results_receiver.bind_to_random_port("tcp://{}".format(ip_address),
                                                               min_port=port_range[0],
                                                               max_port=port_range[1])

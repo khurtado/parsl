@@ -11,7 +11,6 @@ import logging
 import queue
 import threading
 import json
-import psutil
 
 from parsl.version import VERSION as PARSL_VERSION
 from ipyparallel.serialize import serialize_object
@@ -298,9 +297,6 @@ class Interchange(object):
         while not self._kill_event.is_set():
             self.socks = dict(poller.poll(timeout=poll_period))
 
-            logger.debug("[MAIN] CPU: {} MEM: {}".format(psutil.cpu_percent(),
-                                                         psutil.virtual_memory()))
-
             # Listen for requests for work
             if self.task_outgoing in self.socks and self.socks[self.task_outgoing] == zmq.POLLIN:
                 message = self.task_outgoing.recv_multipart()
@@ -343,7 +339,6 @@ class Interchange(object):
                     if tasks:
                         # We should be able to send without blocking here, because manager already
                         # do rate limiting via advertizing capacity
-                        time.sleep(0.01)
                         x = self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)],
                                                               copy=True)
                         task_count = len(tasks)
