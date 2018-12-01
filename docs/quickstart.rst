@@ -61,11 +61,16 @@ Here's a list of the components and their extras option:
 * Google Cloud : `google_cloud`
 * Extreme Scale Executor (Supercomputing) : `extreme_scale`
 * Database logging of monitoring data : `db_logging`
-* Jetstream (NSF Cloud) : `jetstream`
+* Web based visualization : `parsl-visualize`
 
 Optional extras can be installed using the following syntax::
 
-     $ python3 -m pip install parsl[<optional_package1>, <optional_package2>]
+  $ python3 -m pip install parsl[<optional_package1>, <optional_package2>]
+
+To install all the optional extras you may use the following command::
+
+  $ python3 -m pip install parsl[all]
+
 
 For Developers
 --------------
